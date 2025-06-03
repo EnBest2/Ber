@@ -21,7 +21,8 @@
       <a href="index.html" class="text-blue-400 hover:underline">&larr; Vissza</a>
       <div id="fileInfo" class="font-semibold"></div>
     </header>
-    <div id="viewerContent" class="flex-1 flex items-center justify-center">
+    <!-- A viewerContent konténerben rejtegetjük a tartalmat, vízszintes gördítés nélkül -->
+    <div id="viewerContent" class="flex-1 flex items-center justify-center overflow-x-hidden">
       <p>Betöltés...</p>
     </div>
     <footer class="mt-4 text-center">
@@ -31,17 +32,17 @@
     </footer>
   </div>
   <script>
-    // Lekérjük az URL paraméterből a fájl azonosítót (viewer.html?id=<id>)
+    // Függvény az URL paraméter lekérésére (pl. viewer.html?id=<id>)
     function getQueryParam(parameter) {
       const urlParams = new URLSearchParams(window.location.search);
       return urlParams.get(parameter);
     }
-    
+  
     const fileId = getQueryParam("id");
     if (!fileId) {
       document.getElementById("viewerContent").innerHTML = "<p>Nincs fájl kiválasztva.</p>";
     } else {
-      // IndexedDB használata a fájl lekéréséhez
+      // IndexedDB lekérdezés a fájl betöltéséhez
       const request = indexedDB.open("PayslipsDB", 1);
       request.onsuccess = function(e) {
         const db = e.target.result;
@@ -57,9 +58,10 @@
           const objectUrl = URL.createObjectURL(fileRecord.file);
           let contentHtml = "";
           if (fileRecord.file.type === "application/pdf") {
-            contentHtml = `<iframe src="${objectUrl}" frameborder="0" class="w-full h-[80vh]"></iframe>`;
+            // Az #zoom=FitH paraméter arra kényszeríti a PDF-et, hogy a magassághoz igazodjon
+            contentHtml = `<object data="${objectUrl}#zoom=FitH" type="application/pdf" style="width:100%; height:80vh; max-width:100%;"></object>`;
           } else if (fileRecord.file.type.startsWith("image/")) {
-            contentHtml = `<img src="${objectUrl}" class="w-full max-h-[80vh] object-contain" alt="${fileRecord.filename}"/>`;
+            contentHtml = `<img src="${objectUrl}" class="max-w-full max-h-[80vh] object-contain" alt="${fileRecord.filename}"/>`;
           } else {
             contentHtml = `<p class="text-center">A fájl megtekintéséhez nincs előnézet támogatás.</p>`;
           }
