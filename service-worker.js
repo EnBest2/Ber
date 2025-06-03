@@ -1,6 +1,7 @@
 const CACHE_NAME = "payslips-cache-v1";
 const urlsToCache = [
   "index.html",
+  "viewer.html",
   "manifest.json",
   "service-worker.js",
   "icon.png"
@@ -31,4 +32,4 @@ self.addEventListener("activate", event => {
       );
     })
   );
-});p
+});
