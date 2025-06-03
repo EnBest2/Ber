@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="hu" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bérpapír Kezelő</title>
+  <!-- PWA manifest és apple-touch ikon -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="apple-touch-icon" href="icon.png">
+  <!-- TailwindCSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* Egyedi stílusok a glassmorphism és neon hatás érdekében */
+    body {
+      background: linear-gradient(135deg, #2c003e, #000);
+      min-height: 100vh;
+    }
+    .glow-border {
+      border: 2px solid rgba(92, 107, 192, 0.8);
+      box-shadow: 0 0 10px rgba(92, 107, 192, 0.8);
+    }
+  </style>
+</head>
+<body class="text-white">
+  <div class="container mx-auto p-4">
+    <header class="mb-6 text-center">
+      <h1 class="text-3xl font-bold mb-2">Bérpapír Kezelő</h1>
+      <p class="text-gray-300">Feltöltés, keresés és törlés</p>
+    </header>
+    
+    <!-- Feltöltési szekció -->
+    <div class="flex justify-center mb-4">
+      <label for="uploadInput" class="cursor-pointer flex items-center bg-blue-600 hover:bg-blue-700 transition px-4 py-2 rounded-full shadow-lg">
+        <!-- Feltöltés ikon (Heroicons: Arrow Up Tray) -->
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h10a4 4 0 004-4M7 10l5-5m0 0l5 5m-5-5v12" />
+        </svg>
+        <span>Feltöltés</span>
+      </label>
+      <input type="file" id="uploadInput" accept="application/pdf,image/*" class="hidden">
+    </div>
+    
+    <!-- Keresési szekció -->
+    <div class="flex justify-center mb-6">
+      <div class="relative w-full max-w-md">
+        <input type="text" id="searchInput" placeholder="Keresés (pl. 2024-12)" class="w-full pl-10 pr-4 py-2 rounded-full bg-black bg-opacity-60 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <!-- Keresés ikon -->
+        <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
+          </svg>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Fájlok listája -->
+    <div id="filesContainer" class="space-y-4">
+      <!-- Itt jelennek meg dinamikusan a feltöltött bérpapírok -->
+    </div>
+  </div>
+  
+  <script>
+    // IndexedDB inicializálása
+    let db;
+    const request = indexedDB.open("PayslipsDB", 1);
+    request.onupgradeneeded = function(e) {
+      db = e.target.result;
+      if (!db.objectStoreNames.contains("files")) {
+        db.createObjectStore("files", { keyPath: 'id', autoIncrement: true });
+      }
+    };
+    request.onsuccess = function(e) {
+      db = e.target.result;
+      loadFiles();
+    };
+    request.onerror = function(e) {
+      console.error("IndexedDB hiba:", e);
+    };
+    
+    // Fájlok betöltése és megjelenítése a DB–ből
+    function loadFiles(filter = "") {
+      const transaction = db.transaction("files", "readonly");
+      const store = transaction.objectStore("files");
+      const files = [];
+      store.openCursor().onsuccess = function(event) {
+        const cursor = event.target.result;
+        if (cursor) {
+          files.push(cursor.value);
+          cursor.continue();
+        } else {
+          // Szűrés a keresőmezőben megadott dátum alapján
+          const filteredFiles = files.filter(file => file.filename.includes(filter));
+          displayFiles(filteredFiles);
+        }
+      };
+    }
+    
+    // Fájl kártyák dinamikus létrehozása
+    function displayFiles(files) {
+      const container = document.getElementById("filesContainer");
+      container.innerHTML = "";
+      files.sort((a, b) => b.id - a.id); // Legfrissebbek fent
+      files.forEach(file => {
+        const card = document.createElement("div");
+        card.className = "flex items-center justify-between p-4 bg-[#000000aa] rounded-lg glow-border backdrop-blur transition transform hover:scale-105";
+        
+        // File információk
+        const infoDiv = document.createElement("div");
+        infoDiv.className = "flex items-center";
+        
+        const iconSpan = document.createElement("span");
+        iconSpan.className = "text-3xl mr-3";
+        iconSpan.textContent = "📄";
+        
+        const textDiv = document.createElement("div");
+        const fileNameDiv = document.createElement("div");
+        fileNameDiv.className = "font-bold";
+        fileNameDiv.textContent = file.filename;
+        const dateDiv = document.createElement("div");
+        dateDiv.className = "text-sm text-gray-300";
+        dateDiv.textContent = file.date;
+        
+        textDiv.appendChild(fileNameDiv);
+        textDiv.appendChild(dateDiv);
+        infoDiv.appendChild(iconSpan);
+        infoDiv.appendChild(textDiv);
+        
+        // Törlés gomb
+        const deleteBtn = document.createElement("button");
+        deleteBtn.className = "p-2 rounded-full hover:bg-red-600 transition";
+        deleteBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>`;
+        deleteBtn.addEventListener("click", () => deleteFile(file.id));
+        
+        card.appendChild(infoDiv);
+        card.appendChild(deleteBtn);
+        container.appendChild(card);
+      });
+    }
+    
+    // Fájlfeltöltés kezelése
+    document.getElementById("uploadInput").addEventListener("change", function(event) {
+      const file = event.target.files[0];
+      if (file && db) {
+        const dateObj = new Date();
+        const monthStr = dateObj.getFullYear() + "-" + ("0" + (dateObj.getMonth() + 1)).slice(-2);
+        const ext = file.name.split('.').pop();
+        const newFilename = monthStr + "-bérpapír." + ext;
+        
+        const transaction = db.transaction("files", "readwrite");
+        const store = transaction.objectStore("files");
+        const record = { filename: newFilename, date: monthStr, file: file };
+        const addRequest = store.add(record);
+        addRequest.onsuccess = function() {
+          event.target.value = "";
+          loadFiles(document.getElementById("searchInput").value);
+        };
+        addRequest.onerror = function(e) {
+          console.error("Fájl mentési hiba:", e);
+        };
+      }
+    });
+    
+    // Fájl törlése az azonosító alapján
+    function deleteFile(id) {
+      const transaction = db.transaction("files", "readwrite");
+      const store = transaction.objectStore("files");
+      const deleteRequest = store.delete(id);
+      deleteRequest.onsuccess = function() {
+        loadFiles(document.getElementById("searchInput").value);
+      };
+    }
+    
+    // Keresőfunkció: esemény indításának pillanatában újratöltjük a fájlokat
+    document.getElementById("searchInput").addEventListener("input", function(e) {
+      loadFiles(e.target.value);
+    });
+    
+    // Service Worker regisztrációja az offline működéshez
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('service-worker.js')
+          .then(registration => {
+            console.log('Service Worker sikeresen regisztrálva:', registration.scope);
+          })
+          .catch(error => {
+            console.error('Service Worker regisztráció sikertelen:', error);
+          });
+      });
+    }
+  </script>
+</body>
+</html>
