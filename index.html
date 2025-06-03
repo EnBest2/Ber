@@ -61,13 +61,18 @@
   </div>
   
   <!-- Teljes képernyős modal a fájl megjelenítéséhez -->
-  <div id="modalOverlay" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center hidden">
-    <div class="relative bg-[#000000dd] rounded-lg p-4 w-full max-w-3xl">
-      <!-- Bezárás gomb -->
-      <button id="modalClose" class="absolute top-2 right-2 text-white text-2xl font-bold">&times;</button>
-      <div id="modalContent" class="mt-8"></div>
-      <!-- Letöltési link -->
-      <a id="downloadLink" href="#" class="block mt-4 text-blue-400 hover:underline" download>Letöltés</a>
+  <div id="modalOverlay" class="fixed inset-0 bg-black bg-opacity-75 flex flex-col hidden">
+    <!-- Fejléc a bezáráshoz -->
+    <div class="flex justify-end p-4">
+      <button id="modalClose" class="text-white text-3xl font-bold">&times;</button>
+    </div>
+    <!-- Tartalomkonténer, amely kitölti a rendelkezésre álló teret -->
+    <div id="modalContentContainer" class="flex-1 overflow-auto p-4">
+      <div id="modalContent" class="w-full h-full"></div>
+    </div>
+    <!-- Lábléc, ahol a letöltési link található -->
+    <div class="p-4 text-center">
+      <a id="downloadLink" href="#" class="text-blue-400 hover:underline" download>Letöltés</a>
     </div>
   </div>
   
@@ -106,7 +111,7 @@
       };
     }
     
-    // Fájl kártyák létrehozása, esztétikusabb elrendezéssel és gombokkal
+    // Fájl kártyák létrehozása, esztétikus elrendezéssel és gombokkal
     function displayFiles(files) {
       const container = document.getElementById("filesContainer");
       container.innerHTML = "";
@@ -141,7 +146,7 @@
         const actionsDiv = document.createElement("div");
         actionsDiv.className = "flex justify-end space-x-2";
         
-        // Letöltés gomb – itt is a modális nézet nyitása, ahol a felhasználó letöltheti a fájlt
+        // Letöltés gomb – itt is a modális nézet nyitása
         const downloadBtn = document.createElement("button");
         downloadBtn.className = "p-2 rounded-full bg-green-600 hover:bg-green-700 transition";
         downloadBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -209,7 +214,7 @@
       };
     }
     
-    // Kereső esemény – a beírt szöveg alapján szűrünk (csak ha a fájlnév ezzel kezdődik)
+    // Kereső esemény – a beírt szöveg alapján szűrünk
     document.getElementById("searchInput").addEventListener("input", (e) => {
       loadFiles(e.target.value);
     });
@@ -220,11 +225,11 @@
       const modalContent = document.getElementById("modalContent");
       modalContent.innerHTML = "";
       
-      // Fájl típusától függően jelenítjük meg (PDF: iframe, kép: img, egyéb: üzenet)
+      // Fájl típusától függően jelenítjük meg
       if (fileRecord.file.type === "application/pdf") {
-        modalContent.innerHTML = `<iframe src="${objectUrl}" class="w-full" style="height:80vh;" frameborder="0"></iframe>`;
+        modalContent.innerHTML = `<iframe src="${objectUrl}" frameborder="0" class="w-full h-full"></iframe>`;
       } else if (fileRecord.file.type.startsWith("image/")) {
-        modalContent.innerHTML = `<img src="${objectUrl}" class="w-full max-h-[80vh] object-contain" alt="${fileRecord.filename}"/>`;
+        modalContent.innerHTML = `<img src="${objectUrl}" class="w-full h-full object-contain" alt="${fileRecord.filename}"/>`;
       } else {
         modalContent.innerHTML = `<p class="text-center">A fájl megtekintéséhez nincs előnézet támogatás.</p>`;
       }
@@ -241,7 +246,7 @@
     // Modal bezárása
     document.getElementById("modalClose").addEventListener("click", () => {
       document.getElementById("modalOverlay").classList.add("hidden");
-      // Itt opcionálisan fel lehet szabadítani az object URL–t, ha több ilyen hívás lenne
+      // Opcionálisan fel lehet szabadítani az object URL–t, ha szükséges
     });
     
     // Service Worker regisztrációja offline támogatáshoz
