@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="hu" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fájl Megtekintése</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="apple-touch-icon" href="icon.png">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      background: linear-gradient(135deg, #2c003e, #000);
+      min-height: 100vh;
+    }
+  </style>
+</head>
+<body class="text-white">
+  <div class="container mx-auto p-4 flex flex-col min-h-screen">
+    <header class="flex justify-between items-center mb-4">
+      <a href="index.html" class="text-blue-400 hover:underline">&larr; Vissza</a>
+      <div id="fileInfo" class="font-semibold"></div>
+    </header>
+    <div id="viewerContent" class="flex-1 flex items-center justify-center">
+      <p>Betöltés...</p>
+    </div>
+    <footer class="mt-4 text-center">
+      <a id="downloadLink" href="#" download class="px-4 py-2 rounded-full bg-green-600 hover:bg-green-700 inline-block">
+        Letöltés
+      </a>
+    </footer>
+  </div>
+  <script>
+    // Lekérjük az URL paraméterből a fájl azonosítót (viewer.html?id=<id>)
+    function getQueryParam(parameter) {
+      const urlParams = new URLSearchParams(window.location.search);
+      return urlParams.get(parameter);
+    }
+    
+    const fileId = getQueryParam("id");
+    if (!fileId) {
+      document.getElementById("viewerContent").innerHTML = "<p>Nincs fájl kiválasztva.</p>";
+    } else {
+      // IndexedDB használata a fájl lekéréséhez
+      const request = indexedDB.open("PayslipsDB", 1);
+      request.onsuccess = function(e) {
+        const db = e.target.result;
+        const transaction = db.transaction("files", "readonly");
+        const store = transaction.objectStore("files");
+        const getRequest = store.get(Number(fileId));
+        getRequest.onsuccess = function(e) {
+          const fileRecord = e.target.result;
+          if (!fileRecord) {
+            document.getElementById("viewerContent").innerHTML = "<p>A fájl nem található.</p>";
+            return;
+          }
+          const objectUrl = URL.createObjectURL(fileRecord.file);
+          let contentHtml = "";
+          if (fileRecord.file.type === "application/pdf") {
+            contentHtml = `<iframe src="${objectUrl}" frameborder="0" class="w-full h-[80vh]"></iframe>`;
+          } else if (fileRecord.file.type.startsWith("image/")) {
+            contentHtml = `<img src="${objectUrl}" class="w-full max-h-[80vh] object-contain" alt="${fileRecord.filename}"/>`;
+          } else {
+            contentHtml = `<p class="text-center">A fájl megtekintéséhez nincs előnézet támogatás.</p>`;
+          }
+          document.getElementById("viewerContent").innerHTML = contentHtml;
+          document.getElementById("downloadLink").href = objectUrl;
+          document.getElementById("downloadLink").setAttribute("download", fileRecord.filename);
+          document.getElementById("fileInfo").textContent = fileRecord.filename;
+        };
+      };
+      request.onerror = function(e) {
+        document.getElementById("viewerContent").innerHTML = "<p>Hiba történt a fájl betöltésekor.</p>";
+      };
+    }
+  </script>
+</body>
+</html>
