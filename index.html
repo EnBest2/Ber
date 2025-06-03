@@ -25,7 +25,7 @@
   <div class="container mx-auto p-4">
     <header class="mb-6 text-center">
       <h1 class="text-3xl font-bold mb-2">Bérpapír Kezelő</h1>
-      <p class="text-gray-300">Feltöltés, keresés, megtekintés és törlés</p>
+      <p class="text-gray-300">Feltöltés, keresés, megnyitás és törlés</p>
     </header>
     
     <!-- Feltöltési szekció -->
@@ -59,10 +59,10 @@
   </div>
   
   <script>
-    // Segédfüggvény, amellyel a feltöltéskor számoljuk ki az előző hónapot
+    // Segédfüggvény, amellyel a feltöltéskor az előző hónap stringjét számoljuk ki
     function getPreviousMonthStr(date) {
       let year = date.getFullYear();
-      let month = date.getMonth(); // 0-alapú: 0=jan, 11=dec
+      let month = date.getMonth(); // 0-alapú (0 = január)
       if (month === 0) {
         year = year - 1;
         month = 11;
@@ -89,7 +89,7 @@
       console.error("IndexedDB hiba:", e);
     };
   
-    // Fájlok betöltése; szűrjük, hogy a fájlnevek a beírt értékkel kezdődjenek
+    // Fájlok betöltése; szűrés: csak azok a bejegyzések jelennek meg, amelyek fájlneve a megadott szöveggel kezdődik
     function loadFiles(filter = "") {
       const transaction = db.transaction("files", "readonly");
       const store = transaction.objectStore("files");
@@ -110,16 +110,19 @@
     function displayFiles(files) {
       const container = document.getElementById("filesContainer");
       container.innerHTML = "";
+      // Legfrissebbek elöl (növekvő id alapján fordított sorrendben)
       files.sort((a, b) => b.id - a.id);
       files.forEach(file => {
         const card = document.createElement("div");
         card.className = "cursor-pointer flex flex-col justify-between p-4 bg-[#000000aa] rounded-lg glow-border backdrop-blur transition transform hover:scale-105";
-        
+  
         const infoDiv = document.createElement("div");
         infoDiv.className = "flex items-center mb-4";
+  
         const iconSpan = document.createElement("span");
         iconSpan.className = "text-3xl mr-3";
         iconSpan.textContent = "📄";
+  
         const textDiv = document.createElement("div");
         const fileNameDiv = document.createElement("div");
         fileNameDiv.className = "font-bold text-lg";
@@ -127,25 +130,25 @@
         const dateDiv = document.createElement("div");
         dateDiv.className = "text-sm text-gray-300";
         dateDiv.textContent = file.date;
+  
         textDiv.appendChild(fileNameDiv);
         textDiv.appendChild(dateDiv);
         infoDiv.appendChild(iconSpan);
         infoDiv.appendChild(textDiv);
-        
-        // Gombok: "Megtekintés" és "Törlés"
+  
+        // Gombok: "Megnyitás" és "Törlés"
         const actionsDiv = document.createElement("div");
         actionsDiv.className = "flex justify-end space-x-2";
-        
-        // Megtekintés gomb – navigáljunk a viewer.html oldalra a file id-jével
+  
         const viewBtn = document.createElement("button");
         viewBtn.className = "px-3 py-2 rounded-full bg-blue-600 hover:bg-blue-700 transition";
-        viewBtn.textContent = "Megtekintés";
+        viewBtn.textContent = "Megnyitás";
+        // A gomb (vagy a teljes kártya) kattintásakor a file megnyílik egy új fülön
         viewBtn.addEventListener("click", (e) => {
           e.stopPropagation();
-          window.location.href = "viewer.html?id=" + file.id;
+          openFile(file);
         });
-        
-        // Törlés gomb
+  
         const deleteBtn = document.createElement("button");
         deleteBtn.className = "px-3 py-2 rounded-full bg-red-600 hover:bg-red-700 transition";
         deleteBtn.textContent = "Törlés";
@@ -153,23 +156,29 @@
           e.stopPropagation();
           deleteFile(file.id);
         });
-        
+  
         actionsDiv.appendChild(viewBtn);
         actionsDiv.appendChild(deleteBtn);
   
         card.appendChild(infoDiv);
         card.appendChild(actionsDiv);
   
-        // A kártya egészére kattintva is megnyitjuk a viewer oldalt
+        // A kártya egészére kattintva is megnyitás történik
         card.addEventListener("click", () => {
-          window.location.href = "viewer.html?id=" + file.id;
+          openFile(file);
         });
-        
+  
         container.appendChild(card);
       });
     }
   
-    // Fájlfeltöltés kezelése – a fájl neve mostantól az előző hónap alapján kerül elkészítésre
+    // Megnyitja a fájlt egy új böngészőfülön
+    function openFile(fileRecord) {
+      const objectUrl = URL.createObjectURL(fileRecord.file);
+      window.open(objectUrl, "_blank");
+    }
+  
+    // Fájlfeltöltés kezelése – a fájl neve az előző hónap alapján készül (például: 2025-05-bérpapír.pdf)
     document.getElementById("uploadInput").addEventListener("change", (event) => {
       const fileInput = event.target.files[0];
       if (fileInput && db) {
@@ -177,7 +186,7 @@
         const monthStr = getPreviousMonthStr(dateObj);
         const ext = fileInput.name.split('.').pop();
         const newFilename = monthStr + "-bérpapír." + ext;
-        
+  
         const transaction = db.transaction("files", "readwrite");
         const store = transaction.objectStore("files");
         const record = { filename: newFilename, date: monthStr, file: fileInput };
@@ -202,12 +211,12 @@
       };
     }
   
-    // Kereső esemény
+    // Kereső esemény, mely a megadott dátummal kezdődő fájlokat jeleníti meg
     document.getElementById("searchInput").addEventListener("input", (e) => {
       loadFiles(e.target.value);
     });
   
-    // Service Worker regisztrációja
+    // Service Worker regisztrációja az offline támogatáshoz
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('service-worker.js')
