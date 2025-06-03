@@ -26,7 +26,7 @@
   <div class="container mx-auto p-4">
     <header class="mb-6 text-center">
       <h1 class="text-3xl font-bold mb-2">Bérpapír Kezelő</h1>
-      <p class="text-gray-300">Feltöltés, keresés és törlés</p>
+      <p class="text-gray-300">Feltöltés, keresés, megnyitás és törlés</p>
     </header>
     
     <!-- Feltöltési szekció -->
@@ -44,19 +44,30 @@
     <!-- Keresési szekció -->
     <div class="flex justify-center mb-6">
       <div class="relative w-full max-w-md">
-        <input type="text" id="searchInput" placeholder="Keresés (pl. 2024-12)" class="w-full pl-10 pr-4 py-2 rounded-full bg-black bg-opacity-60 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <input type="text" id="searchInput" placeholder="Keresés (pl. 2025-06)" class="w-full pl-10 pr-4 py-2 rounded-full bg-black bg-opacity-60 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
         <!-- Keresés ikon -->
         <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
           </svg>
         </div>
       </div>
     </div>
     
-    <!-- Fájlok listája -->
-    <div id="filesContainer" class="space-y-4">
+    <!-- Fájlok listája – rezponzív grid -->
+    <div id="filesContainer" class="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
       <!-- Itt jelennek meg dinamikusan a feltöltött bérpapírok -->
+    </div>
+  </div>
+  
+  <!-- Teljes képernyős modal a fájl megjelenítéséhez -->
+  <div id="modalOverlay" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center hidden">
+    <div class="relative bg-[#000000dd] rounded-lg p-4 w-full max-w-3xl">
+      <!-- Bezárás gomb -->
+      <button id="modalClose" class="absolute top-2 right-2 text-white text-2xl font-bold">&times;</button>
+      <div id="modalContent" class="mt-8"></div>
+      <!-- Letöltési link -->
+      <a id="downloadLink" href="#" class="block mt-4 text-blue-400 hover:underline" download>Letöltés</a>
     </div>
   </div>
   
@@ -78,7 +89,7 @@
       console.error("IndexedDB hiba:", e);
     };
     
-    // Fájlok betöltése és megjelenítése a DB–ből
+    // Fájlok betöltése, keresési feltétel: ha a beírt értékkel KEZDŐDIK a fájlnév
     function loadFiles(filter = "") {
       const transaction = db.transaction("files", "readonly");
       const store = transaction.objectStore("files");
@@ -89,25 +100,25 @@
           files.push(cursor.value);
           cursor.continue();
         } else {
-          // Szűrés a keresőmezőben megadott dátum alapján
-          const filteredFiles = files.filter(file => file.filename.includes(filter));
+          const filteredFiles = files.filter(file => filter === "" || file.filename.startsWith(filter));
           displayFiles(filteredFiles);
         }
       };
     }
     
-    // Fájl kártyák dinamikus létrehozása
+    // Fájl kártyák létrehozása, esztétikusabb elrendezéssel és gombokkal
     function displayFiles(files) {
       const container = document.getElementById("filesContainer");
       container.innerHTML = "";
-      files.sort((a, b) => b.id - a.id); // Legfrissebbek fent
+      files.sort((a, b) => b.id - a.id); // legfrissebbek elöl
       files.forEach(file => {
+        // Kártya létrehozása
         const card = document.createElement("div");
-        card.className = "flex items-center justify-between p-4 bg-[#000000aa] rounded-lg glow-border backdrop-blur transition transform hover:scale-105";
+        card.className = "cursor-pointer flex flex-col justify-between p-4 bg-[#000000aa] rounded-lg glow-border backdrop-blur transition transform hover:scale-105";
         
-        // File információk
+        // Információs blokk
         const infoDiv = document.createElement("div");
-        infoDiv.className = "flex items-center";
+        infoDiv.className = "flex items-center mb-4";
         
         const iconSpan = document.createElement("span");
         iconSpan.className = "text-3xl mr-3";
@@ -115,7 +126,7 @@
         
         const textDiv = document.createElement("div");
         const fileNameDiv = document.createElement("div");
-        fileNameDiv.className = "font-bold";
+        fileNameDiv.className = "font-bold text-lg";
         fileNameDiv.textContent = file.filename;
         const dateDiv = document.createElement("div");
         dateDiv.className = "text-sm text-gray-300";
@@ -126,32 +137,57 @@
         infoDiv.appendChild(iconSpan);
         infoDiv.appendChild(textDiv);
         
+        // Gombok blokk (letöltés, törlés)
+        const actionsDiv = document.createElement("div");
+        actionsDiv.className = "flex justify-end space-x-2";
+        
+        // Letöltés gomb – itt is a modális nézet nyitása, ahol a felhasználó letöltheti a fájlt
+        const downloadBtn = document.createElement("button");
+        downloadBtn.className = "p-2 rounded-full bg-green-600 hover:bg-green-700 transition";
+        downloadBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1M4 12l8 8m0 0l8-8M12 4v12" />
+        </svg>`;
+        downloadBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          openModal(file);
+        });
+        
         // Törlés gomb
         const deleteBtn = document.createElement("button");
-        deleteBtn.className = "p-2 rounded-full hover:bg-red-600 transition";
+        deleteBtn.className = "p-2 rounded-full bg-red-600 hover:bg-red-700 transition";
         deleteBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
         </svg>`;
-        deleteBtn.addEventListener("click", () => deleteFile(file.id));
+        deleteBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          deleteFile(file.id);
+        });
+        
+        actionsDiv.appendChild(downloadBtn);
+        actionsDiv.appendChild(deleteBtn);
         
         card.appendChild(infoDiv);
-        card.appendChild(deleteBtn);
+        card.appendChild(actionsDiv);
+        
+        // Kattintás a fájl teljes képernyős megnyitásához
+        card.addEventListener("click", () => openModal(file));
+        
         container.appendChild(card);
       });
     }
     
     // Fájlfeltöltés kezelése
-    document.getElementById("uploadInput").addEventListener("change", function(event) {
-      const file = event.target.files[0];
-      if (file && db) {
+    document.getElementById("uploadInput").addEventListener("change", (event) => {
+      const fileInput = event.target.files[0];
+      if (fileInput && db) {
         const dateObj = new Date();
         const monthStr = dateObj.getFullYear() + "-" + ("0" + (dateObj.getMonth() + 1)).slice(-2);
-        const ext = file.name.split('.').pop();
+        const ext = fileInput.name.split('.').pop();
         const newFilename = monthStr + "-bérpapír." + ext;
         
         const transaction = db.transaction("files", "readwrite");
         const store = transaction.objectStore("files");
-        const record = { filename: newFilename, date: monthStr, file: file };
+        const record = { filename: newFilename, date: monthStr, file: fileInput };
         const addRequest = store.add(record);
         addRequest.onsuccess = function() {
           event.target.value = "";
@@ -163,7 +199,7 @@
       }
     });
     
-    // Fájl törlése az azonosító alapján
+    // Fájl törlése azonosító alapján
     function deleteFile(id) {
       const transaction = db.transaction("files", "readwrite");
       const store = transaction.objectStore("files");
@@ -173,14 +209,44 @@
       };
     }
     
-    // Keresőfunkció: esemény indításának pillanatában újratöltjük a fájlokat
-    document.getElementById("searchInput").addEventListener("input", function(e) {
+    // Kereső esemény – a beírt szöveg alapján szűrünk (csak ha a fájlnév ezzel kezdődik)
+    document.getElementById("searchInput").addEventListener("input", (e) => {
       loadFiles(e.target.value);
     });
     
-    // Service Worker regisztrációja az offline működéshez
+    // Modal megnyitása a fájl előnézetével és letöltési lehetőséggel
+    function openModal(fileRecord) {
+      const objectUrl = URL.createObjectURL(fileRecord.file);
+      const modalContent = document.getElementById("modalContent");
+      modalContent.innerHTML = "";
+      
+      // Fájl típusától függően jelenítjük meg (PDF: iframe, kép: img, egyéb: üzenet)
+      if (fileRecord.file.type === "application/pdf") {
+        modalContent.innerHTML = `<iframe src="${objectUrl}" class="w-full" style="height:80vh;" frameborder="0"></iframe>`;
+      } else if (fileRecord.file.type.startsWith("image/")) {
+        modalContent.innerHTML = `<img src="${objectUrl}" class="w-full max-h-[80vh] object-contain" alt="${fileRecord.filename}"/>`;
+      } else {
+        modalContent.innerHTML = `<p class="text-center">A fájl megtekintéséhez nincs előnézet támogatás.</p>`;
+      }
+      
+      // Letöltési link beállítása
+      const downloadLink = document.getElementById("downloadLink");
+      downloadLink.href = objectUrl;
+      downloadLink.setAttribute("download", fileRecord.filename);
+      
+      // Modal megjelenítése
+      document.getElementById("modalOverlay").classList.remove("hidden");
+    }
+    
+    // Modal bezárása
+    document.getElementById("modalClose").addEventListener("click", () => {
+      document.getElementById("modalOverlay").classList.add("hidden");
+      // Itt opcionálisan fel lehet szabadítani az object URL–t, ha több ilyen hívás lenne
+    });
+    
+    // Service Worker regisztrációja offline támogatáshoz
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', function() {
+      window.addEventListener('load', () => {
         navigator.serviceWorker.register('service-worker.js')
           .then(registration => {
             console.log('Service Worker sikeresen regisztrálva:', registration.scope);
